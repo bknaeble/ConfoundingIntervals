@@ -1,0 +1,102 @@
+#This file provides open source software
+#to support the methodologies of the paper
+#Regression Analysis of Unmeasured Confounding
+#by Knaeble, Osting, and Abramson.
+
+#Variables:
+#x possibly causes y
+#w is a set of confounding factors
+#p is the observed correlation between x and y
+#sy is the observed standard deviation in y
+#sx is the observed standard deviation in x
+#sr is the ratio sy/sx
+#lx2 is a lower bound for the coefficient of determination of w on x 
+#ux2 is a upper bound for the coefficient of determination of w on x
+#ly2 is a lower bound for the coefficient of determination of w on y 
+#uy2 is a upper bound for the coefficient of determination of w on y 
+#lxy is a lower bound for the correlation between fitted vectors
+#uxy is an upper bound for the correlation between fitted vectors
+
+#Defining the computational algorithm of Proposition 2.2
+f=function(p,sr,lx2,ux2,ly2,uy2,lxy,uxy) {
+tol=.00001 # tolerance
+# tolerance is used to avoid roundoff error.
+# feasible boundary points
+# after square rooting and then squaring
+# may be classified as infeasible
+# if not for the tolerance parameter.
+# see "feas" function below
+lx=sqrt(lx2)
+ux=sqrt(ux2)
+ly=sqrt(ly2)
+uy=sqrt(uy2)
+v=numeric(88*3)
+M=matrix(v,ncol=3)
+bx=c(lx,ux) 
+by=c(ly,uy)
+bxy=c(lxy,uxy)
+s1=function(bx,by,bxy) c(((-2*p+sqrt((2*p)^2-4*(-by*bxy)^2))/(-2*by*bxy))^2,by^2,bxy)
+s2=function(bx,by,bxy) c(((-2*p-sqrt((2*p)^2-4*(-by*bxy)^2))/(-2*by*bxy))^2,by^2,bxy)
+s3=function(bx,by,bxy) c((p+1)/(bxy+1),(p+1)/(bxy+1),bxy)
+s4=function(bx,by,bxy) c((p-1)/(bxy-1),(p-1)/(bxy-1),bxy)
+s5=function(bx,by,bxy) c(bx^2,by^2,bxy)
+s6=function(bx,by,bxy) c(bx,by,(p+sqrt(1-bx^2)*sqrt(1-by^2))/(bx*by))
+s7=function(bx,by,bxy) c(bx,by,(p-sqrt(1-bx^2)*sqrt(1-by^2))/(bx*by))
+s8=function(bx,by,bxy) c(bx^2,((-(-2*bx*bxy*p)+sqrt((-2*bx*bxy*p)^2-4*(bx^2*bxy^2+1-bx^2)*(bx^2-1+p^2)))/(2*(bx^2*bxy^2+1-bx^2)))^2,bxy)
+s9=function(bx,by,bxy) c(bx^2,((-(-2*bx*bxy*p)-sqrt((-2*bx*bxy*p)^2-4*(bx^2*bxy^2+1-bx^2)*(bx^2-1+p^2)))/(2*(bx^2*bxy^2+1-bx^2)))^2,bxy)
+s10=function(bx,by,bxy) c(((-(-2*bx*bxy*p)+sqrt((-2*bx*bxy*p)^2-4*(bx^2*bxy^2+1-bx^2)*(bx^2-1+p^2)))/(2*(bx^2*bxy^2+1-bx^2)))^2,by^2,bxy)
+s11=function(bx,by,bxy) c(((-(-2*bx*bxy*p)-sqrt((-2*bx*bxy*p)^2-4*(bx^2*bxy^2+1-bx^2)*(bx^2-1+p^2)))/(2*(bx^2*bxy^2+1-bx^2)))^2,by^2,bxy)
+w=c(s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11)
+for (i in 1:2) {
+for (j in 1:2) {
+for (k in 1:2) {
+for (l in 1:11) {
+r=((l-1)*8)+(4*(i-1)+2*(j-1)+1*(k-1)+1)
+M[r,]=w[[l]](bx[i],by[j],bxy[k])
+}}}}
+M
+feas=function(arg) 
+{
+arg[1]>=(lx2-tol) & 
+arg[1]<=(ux2+tol) &
+arg[2]>=(ly2-tol) &
+arg[2]<=(uy2+tol) &
+arg[3]>=(lxy-tol) &
+arg[3]<=(uxy+tol) 
+}
+fs=apply(M,1,feas)
+N=M[which(fs==TRUE),]
+obj=function(arg) sr*(p-sqrt(arg[1])*sqrt(arg[2])*arg[3])/(1-arg[1])
+l=min(apply(N,1,obj))
+u=max(apply(N,1,obj))
+return(c(l,u))
+}
+
+#(disclaimer:) a warning message about NaNs produced
+# may be due to the discriminant of the quadratic being negative
+# in which case those points with complex arguments 
+# are not feasible anyway.  
+
+#(reminders:) input variables
+#f(p,sr,lx2,ux2,ly2,uy2,lxy,uxy)
+# p and sr are observed
+#lx2, ux2, ly2, and uy2 bound coefficients of determination, i.e R^2 values
+
+#(example:)
+#how to compute a confounding interval using the algorithm of Proposition 2.2
+f(-.11,42.94,.1,.5,0,.2,0,1)
+
+#(example:)
+#how to make a plot as in Figure 2
+h=numeric(2001)
+M=matrix(numeric(4002),ncol=2)
+for (i in 1:2001) 
+{
+h[i]=(i-1001)/1000
+M[i,]=f(-.11,42.94,.1,.5,0,.2,h[i],h[i])
+}
+#l(i)=M[,1] and u(i)=M[,2]
+plot(h,M[,1],col="blue",ylim=c(min(M),max(M)),
+xlab="correlation between fitted vectors",
+ylab="adjusted slope coefficient")
+points(h,M[,2],col="red")
